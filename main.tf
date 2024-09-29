@@ -22,25 +22,26 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Buscar a última AMI Ubuntu
-data "aws_ami" "ubuntu" {
-  most_recent = true
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+# Criando a VPC
+resource "aws_vpc" "main_vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name = "MainVPC"
   }
+}
 
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
+# Criando a sub-rede na VPC
+resource "aws_subnet" "main_subnet" {
+  vpc_id            = aws_vpc.main_vpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "MainSubnet"
   }
-
-  owners = ["099720109477"] # Canonical
 }
 
 # Recurso de grupo de segurança para SQL Server
-resource "aws_security_group" "sql-sg" {
+resource "aws_security_group" "sql_sg" {
   name        = "sql-sg"
   description = "Security group for SQL Server instance"
 
@@ -48,7 +49,7 @@ resource "aws_security_group" "sql-sg" {
     from_port   = 1433
     to_port     = 1433
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Permitir acesso público à porta 1433 (ajuste conforme necessário)
+    cidr_blocks = [aws_vpc.main_vpc.cidr_block] # Permitir acesso apenas na VPC
   }
 
   egress {
@@ -61,11 +62,11 @@ resource "aws_security_group" "sql-sg" {
 
 # Instância EC2 para rodar SQL Server
 resource "aws_instance" "sqlserver" {
-  ami           = data.aws_ami.ubuntu.id
+  ami           = "ami-12345678" # Insira a AMI desejada aqui
   instance_type = "t2.medium" # Para rodar SQL Server, um tipo de instância maior pode ser necessário
 
-  # Conectar à segurança da rede
-  vpc_security_group_ids = [aws_security_group.sql-sg.id]
+  vpc_security_group_ids = [aws_security_group.sql_sg.id]
+  subnet_id              = aws_subnet.main_subnet.id  # Associar à sub-rede
 
   user_data = <<-EOF
               #!/bin/bash
@@ -76,11 +77,27 @@ resource "aws_instance" "sqlserver" {
               
               # Rodar o SQL Server em um container Docker
               docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=quickfood-backend#2024" \
-              -e "MSSQL_PID=Developer" -e "MSSQL_TCP_PORT=1433" \
-              -p 1433:1433 -d mcr.microsoft.com/mssql/server:2019-latest
+              -e "MSSQL_PID=Developer" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2019-latest
               EOF
 
   tags = {
     Name = "Quickfood SQL Server"
   }
+}
+
+# Outputs para exportar variáveis
+output "vpc_id" {
+  value = aws_vpc.main_vpc.id
+}
+
+output "subnet_id" {
+  value = aws_subnet.main_subnet.id
+}
+
+output "security_group_id" {
+  value = aws_security_group.sql_sg.id
+}
+
+output "sql_server_ip" {
+  value = aws_instance.sqlserver.private_ip
 }
