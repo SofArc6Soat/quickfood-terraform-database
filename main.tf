@@ -10,14 +10,12 @@ terraform {
 
   cloud {
     organization = "SofArc6Soat"
-
     workspaces {
       name = "quickfood-database"
     }
   }
 }
 
-# Provedor AWS
 provider "aws" {
   region = "us-east-1"
 }
@@ -30,7 +28,7 @@ resource "aws_vpc" "main_vpc" {
   }
 }
 
-# Criando a sub-rede na VPC
+# Criando a Subnet
 resource "aws_subnet" "main_subnet" {
   vpc_id            = aws_vpc.main_vpc.id
   cidr_block        = "10.0.1.0/24"
@@ -40,7 +38,7 @@ resource "aws_subnet" "main_subnet" {
   }
 }
 
-# Recurso de grupo de segurança para SQL Server
+# Criando o Security Group para SQL Server
 resource "aws_security_group" "sql_sg" {
   name        = "sql-sg"
   description = "Security group for SQL Server instance"
@@ -49,7 +47,7 @@ resource "aws_security_group" "sql_sg" {
     from_port   = 1433
     to_port     = 1433
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main_vpc.cidr_block] # Permitir acesso apenas na VPC
+    cidr_blocks = [aws_vpc.main_vpc.cidr_block]  # Permitir comunicação apenas na VPC
   }
 
   egress {
@@ -62,20 +60,18 @@ resource "aws_security_group" "sql_sg" {
 
 # Instância EC2 para rodar SQL Server
 resource "aws_instance" "sqlserver" {
-  ami           = "ami-12345678" # Insira a AMI correta
-  instance_type = "t2.medium" # Para rodar SQL Server, um tipo de instância maior pode ser necessário
+  ami           = "ami-0a313d6098716f372" # AMI do Ubuntu (modifique conforme a necessidade)
+  instance_type = "t2.medium" # Para SQL Server, uma instância maior pode ser necessária
 
   vpc_security_group_ids = [aws_security_group.sql_sg.id]
-  subnet_id              = aws_subnet.main_subnet.id  # Associar à sub-rede
+  subnet_id              = aws_subnet.main_subnet.id
 
-  # Script de inicialização da instância EC2
   user_data = <<-EOF
               #!/bin/bash
+              # Instalação e configuração do SQL Server no Docker
               apt-get update
               apt-get install -y docker.io
               systemctl start docker
-              
-              # Rodar o SQL Server em um container Docker
               docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=quickfood-backend#2024" \
               -e "MSSQL_PID=Developer" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2019-latest
               EOF
@@ -92,10 +88,6 @@ output "vpc_id" {
 
 output "subnet_id" {
   value = aws_subnet.main_subnet.id
-}
-
-output "security_group_id" {
-  value = aws_security_group.sql_sg.id
 }
 
 output "sql_server_ip" {
