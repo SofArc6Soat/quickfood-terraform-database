@@ -1,4 +1,4 @@
- # Quickfood Backend - Infraestrutura com Terraform
+ # Quickfood SQL - Infraestrutura com Terraform
  
  Este repositório contém a configuração do Terraform para provisionar a infraestrutura necessária para o backend do projeto Quickfood na AWS.
  
@@ -12,7 +12,6 @@
  ```plaintext
  .
  ├── main.tf           # Configuração principal do Terraform
- └── variables.tf      # Variáveis utilizadas na configuração
  ```
  
  ## Como Configurar o Terraform
@@ -26,8 +25,7 @@
  
  1. **Clone o repositório:**
     ```bash
-    git clone https://github.com/seu_usuario/quickfood-backend.git
-    cd quickfood-backend/infra
+    git clone https://github.com/SofArc6Soat/quickfood-terraform-database.git
     ```
  
  2. **Inicialize o Terraform:**

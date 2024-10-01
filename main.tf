@@ -10,96 +10,94 @@ terraform {
 
   cloud {
     organization = "SofArc6Soat"
+
     workspaces {
       name = "quickfood-database"
     }
   }
 }
+
+# Provedor AWS
 provider "aws" {
-  region = "us-east-1"  # Altere para a região desejada
+  region = "us-east-1"
 }
 
-# Criar uma VPC
+# Criando a VPC
 resource "aws_vpc" "main_vpc" {
   cidr_block = "10.0.0.0/16"
+  tags = {
+    Name = "MainVPC"
+  }
 }
 
-# Criar uma Subnet
+# Criando a sub-rede na VPC
 resource "aws_subnet" "main_subnet" {
   vpc_id            = aws_vpc.main_vpc.id
   cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "MainSubnet"
+  }
 }
 
-# Security Group para o SQL Server
+# Recurso de grupo de segurança para SQL Server
 resource "aws_security_group" "sql_sg" {
-  vpc_id      = aws_vpc.main_vpc.id
   name        = "sql-sg"
+  description = "Security group for SQL Server instance"
 
   ingress {
     from_port   = 1433
     to_port     = 1433
     protocol    = "tcp"
-    cidr_blocks = [aws_subnet.main_subnet.cidr_block]  # Permitir apenas na mesma VPC
+    cidr_blocks = [aws_vpc.main_vpc.cidr_block] # Permitir acesso apenas na VPC
   }
 
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"  # Permitir todo o tráfego de saída
+    protocol    = "-1" # Permitir todo o tráfego de saída
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-# Instância do SQL Server
+# Instância EC2 para rodar SQL Server
 resource "aws_instance" "sqlserver" {
-  ami                    = "ami-12345678"  # Insira a AMI do SQL Server
-  instance_type         = "t2.micro"
-  subnet_id             = aws_subnet.main_subnet.id
+  ami           = "ami-12345678" 
+  instance_type = "t2.medium" 
+
   vpc_security_group_ids = [aws_security_group.sql_sg.id]
+  subnet_id              = aws_subnet.main_subnet.id  # Associar à sub-rede
+
+  user_data = <<-EOF
+              #!/bin/bash
+              # Atualizar e instalar Docker
+              apt-get update
+              apt-get install -y docker.io
+              systemctl start docker
+              
+              # Rodar o SQL Server em um container Docker
+              docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=quickfood-backend#2024" \
+              -e "MSSQL_PID=Developer" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2019-latest
+              EOF
 
   tags = {
-    Name = "SQLServerInstance"
+    Name = "Quickfood SQL Server"
   }
 }
 
-# Security Group para o Backend
-resource "aws_security_group" "backend_sg" {
-  vpc_id      = aws_vpc.main_vpc.id
-  name        = "backend-sg"
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Permitir acesso público na porta 80
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"  # Permitir todo o tráfego de saída
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+# Outputs para exportar variáveis
+output "vpc_id" {
+  value = aws_vpc.main_vpc.id
 }
 
-# Instância do Backend
-resource "aws_instance" "backend" {
-  ami                    = "ami-12345678"  # Insira a AMI da aplicação
-  instance_type         = "t2.micro"
-  subnet_id             = aws_subnet.main_subnet.id
-  vpc_security_group_ids = [aws_security_group.backend_sg.id]
-
-  tags = {
-    Name = "BackendInstance"
-  }
+output "subnet_id" {
+  value = aws_subnet.main_subnet.id
 }
 
-# Output para o endereço IP da instância do banco de dados
+output "security_group_id" {
+  value = aws_security_group.sql_sg.id
+}
+
 output "sql_server_ip" {
   value = aws_instance.sqlserver.private_ip
-}
-
-# Output para o endereço IP da instância do backend
-output "backend_ip" {
-  value = aws_instance.backend.private_ip
 }
