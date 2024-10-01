@@ -62,8 +62,8 @@ resource "aws_security_group" "sql_sg" {
 
 # Instância EC2 para rodar SQL Server
 resource "aws_instance" "sqlserver" {
-  ami           = "ami-12345678" # Insira a AMI desejada aqui
-  instance_type = "t2.medium" # Para rodar SQL Server, um tipo de instância maior pode ser necessário
+  ami           = "ami-12345678" 
+  instance_type = "t2.medium" 
 
   vpc_security_group_ids = [aws_security_group.sql_sg.id]
   subnet_id              = aws_subnet.main_subnet.id  # Associar à sub-rede
